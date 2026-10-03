@@ -1,5 +1,5 @@
-<svg width="985" height="195" viewBox="0 0 985 195" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="985" height="195" rx="8" fill="#1a1b27"/>
+<svg width="982" height="195" viewBox="0 0 982 195" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="982" height="195" rx="4.5" fill="#1A1B27"/>
   <svg x="5" y="0" width="467" height="195">
     
       <svg
@@ -234,8 +234,8 @@
       </svg>
     
   </svg>
-  <line x1="482" y1="25" x2="482" y2="170" stroke="#383e5a" stroke-width="1.5" stroke-linecap="round" />
-  <svg x="490" y="0" width="495" height="195">
+  <line x1="477" y1="28" x2="477" y2="170" vector-effect="non-scaling-stroke" stroke-width="1" stroke="#E4E2E2" stroke-linejoin="miter" stroke-linecap="square" stroke-miterlimit="3"/>
+  <svg x="482" y="0" width="495" height="195">
     <svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink'
                 style='isolation: isolate' viewBox='0 0 495 195' width='495px' height='195px' direction='ltr'>
         <style>
