@@ -25,13 +25,12 @@
 ---
 
 ## 统计
-![](https://github-readme-stats.vercel.app/api?username=dengyie&show_icons=true&theme=tokyonight)
 
-
-![](https://github-readme-stats.vercel.app/api/top-langs/?username=dengyie&layout=compact&theme=tokyonight)
-
-
-![](https://streak-stats.demolab.com?user=dengyie&theme=tokyonight)
+<p align="center">
+  <img height="150" src="https://github-readme-stats.vercel.app/api?username=dengyie&show_icons=true&theme=tokyonight&hide_border=true" alt="dengyie stats" />
+  <img height="150" src="https://github-readme-stats.vercel.app/api/top-langs/?username=dengyie&layout=compact&theme=tokyonight&hide_border=true" alt="top langs" />
+  <img height="150" src="https://streak-stats.demolab.com?user=dengyie&theme=tokyonight&hide_border=true" alt="streak" />
+</p>
 
 ## 略懂这些
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)
