@@ -1,0 +1,34 @@
+name: Update GitHub Stats SVG
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # 每天 UTC 0 点自动刷新
+  workflow_dispatch:
+
+jobs:
+  update-stats:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Generate Combined Stats SVG
+        run: python3 scripts/generate-stats.py
+
+      - name: Commit and Push if changed
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add assets/github-stats.svg
+          if git diff --staged --quiet; then
+            echo "No changes in stats SVG"
+          else
+            git commit -m "chore: auto update github-stats.svg"
+            git push
+          fi
