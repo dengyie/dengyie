@@ -9,18 +9,18 @@
 
 ## 我在做的东西
 
-| 项目 | 简介 |
-|------|------|
-| [agent-fleet](https://github.com/dengyie/agent-fleet) | 轻量 Agent 状态监控，Push-only 免内网穿透 |
-| [game-auto-framework](https://github.com/dengyie/game-auto-framework) | 自动化任务与 DAG 流水线调度框架 |
-| [slidex](https://github.com/dengyie/slidex) | 滑块验证码自识别与拟人轨迹库 |
-| [one-mail](https://github.com/dengyie/one-mail) | 多邮箱聚合转发到 Cloudflare Worker API |
-| [cf-doh](https://github.com/dengyie/cf-doh) | 基于 Cloudflare Worker 的 DoH 智能分流网关 |
-| [xianyu-auto-bot](https://github.com/dengyie/xianyu-auto-bot) | 闲鱼自动化客服与发货机器人 |
-| [mihomo-suite](https://github.com/dengyie/mihomo-suite) | Clash / Mihomo 订阅清洗与分流诊断 |
-| [ai-register-machine](https://github.com/dengyie/ai-register-machine) | 批量账号并发注册与邮箱验证工具 |
-| [mango-hub](https://github.com/dengyie/mango-hub) | 极简 VPS 监控面板与探针 |
-| [zcode2api](https://github.com/dengyie/zcode2api) | 大模型账号池轮询与反代网关 |
+| 项目 | 简介 | 技术栈 |
+|------|------|--------|
+| [agent-fleet](https://github.com/dengyie/agent-fleet) | 轻量 Agent 状态监控，Push-only 免内网穿透 | `Python` `FastAPI` `Vue` |
+| [game-auto-framework](https://github.com/dengyie/game-auto-framework) | 自动化任务与 DAG 流水线调度框架 | `Python` `Playwright` `OpenCV` |
+| [slidex](https://github.com/dengyie/slidex) | 滑块验证码自识别与拟人轨迹库 | `Python` `Playwright` `OpenCV` |
+| [one-mail](https://github.com/dengyie/one-mail) | 多邮箱聚合转发到 Cloudflare Worker API | `Cloudflare Workers` `TypeScript` |
+| [cf-doh](https://github.com/dengyie/cf-doh) | 基于 Cloudflare Worker 的 DoH 智能分流网关 | `Cloudflare Workers` `TypeScript` |
+| [xianyu-auto-bot](https://github.com/dengyie/xianyu-auto-bot) | 闲鱼自动化客服与发货机器人 | `Python` `FastAPI` `Playwright` |
+| [mihomo-suite](https://github.com/dengyie/mihomo-suite) | Clash / Mihomo 订阅清洗与分流诊断 | `TypeScript` `Go` |
+| [ai-register-machine](https://github.com/dengyie/ai-register-machine) | 批量账号并发注册与邮箱验证工具 | `Python` `FastAPI` `Vue` |
+| [mango-hub](https://github.com/dengyie/mango-hub) | 极简 VPS 监控面板与探针 | `Go` `Docker` `Node.js` |
+| [zcode2api](https://github.com/dengyie/zcode2api) | 大模型账号池轮询与反代网关 | `Python` `FastAPI` `Docker` |
 
 
 ## 技术栈
