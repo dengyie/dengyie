@@ -6,8 +6,6 @@
 - 开源开发者，只写自己平时真正需要用的东西
 - Linux / VPS 折腾党，Cloudflare 重度用户
 
----
-
 ## 统计
 
 <p align="center">
