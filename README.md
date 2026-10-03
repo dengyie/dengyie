@@ -22,11 +22,6 @@
 | [mango-hub](https://github.com/dengyie/mango-hub) | 极简 VPS 监控面板与探针 | `Go` `Docker` `Node.js` |
 | [zcode2api](https://github.com/dengyie/zcode2api) | 大模型账号池轮询与反代网关 | `Python` `FastAPI` `Docker` |
 
-
-## 技术栈
-
-`TypeScript` `Python` `Go` `Java` `Kotlin` `React` `Vue` `Flutter` `FastAPI` `Docker` `Cloudflare` ...
-
 ---
 
 ## 统计
