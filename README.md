@@ -27,7 +27,12 @@
 ## 统计
 
 <p align="center">
-  <img src="https://github-profile-summary-cards.vercel.app/api/cards/profile-details?username=dengyie&theme=tokyonight" alt="dengyie profile details" />
+  <img src="https://github-readme-stats.vercel.app/api?username=dengyie&show_icons=true&theme=tokyonight&count_private=true" alt="dengyie stats" />
+  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=dengyie&layout=compact&theme=tokyonight" alt="top langs" />
+</p>
+
+<p align="center">
+  <img src="https://streak-stats.demolab.com?user=dengyie&theme=tokyonight" alt="streak stats" />
 </p>
 
 ## 略懂这些
