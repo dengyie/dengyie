@@ -1,6 +1,6 @@
-<svg width="975" height="195" viewBox="0 0 975 195" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="975" height="195" rx="8" fill="#1a1b27"/>
-  <svg x="5" y="0" width="470" height="195">
+<svg width="985" height="195" viewBox="0 0 985 195" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="985" height="195" rx="8" fill="#1a1b27"/>
+  <svg x="5" y="0" width="467" height="195">
     
       <svg
         width="467"
@@ -234,7 +234,8 @@
       </svg>
     
   </svg>
-  <svg x="480" y="0" width="495" height="195">
+  <line x1="482" y1="25" x2="482" y2="170" stroke="#383e5a" stroke-width="1.5" stroke-linecap="round" />
+  <svg x="490" y="0" width="495" height="195">
     <svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink'
                 style='isolation: isolate' viewBox='0 0 495 195' width='495px' height='195px' direction='ltr'>
         <style>
