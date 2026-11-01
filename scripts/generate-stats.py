@@ -6,7 +6,9 @@ def fetch_svg(url):
     return urllib.request.urlopen(req, timeout=15).read().decode("utf-8")
 
 def main():
-    url_stats = "https://github-readme-stats.vercel.app/api?username=dengyie&show_icons=true&theme=tokyonight&count_private=true&hide_border=true"
+    # Stats card: self-hosted instance on Huawei Cloud SG (see repo wiki / docs),
+    # public instance github-readme-stats.vercel.app suffers recurring DEPLOYMENT_PAUSED.
+    url_stats = "https://grs.mangoqwq.com/index?username=dengyie&show_icons=true&theme=tokyonight&count_private=true&hide_border=true"
     url_streak = "https://streak-stats.demolab.com?user=dengyie&theme=tokyonight&hide_border=true"
 
     try:
