@@ -5,15 +5,38 @@ def fetch_svg(url):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     return urllib.request.urlopen(req, timeout=15).read().decode("utf-8")
 
+def fetch_with_fallback(urls):
+    """Try each URL in order; reject upstream error cards (HTTP 200 but broken SVG)."""
+    last_err = None
+    for url in urls:
+        try:
+            svg = fetch_svg(url)
+            if "Something went wrong" in svg:
+                raise ValueError("upstream returned an error card")
+            return svg, url
+        except Exception as e:
+            print(f"source failed: {url} -> {e}")
+            last_err = e
+    raise last_err
+
 def main():
-    # Stats card: self-hosted instance on Huawei Cloud SG (see repo wiki / docs),
-    # public instance github-readme-stats.vercel.app suffers recurring DEPLOYMENT_PAUSED.
-    url_stats = "https://grs.mangoqwq.com/index?username=dengyie&show_icons=true&theme=tokyonight&count_private=true&hide_border=true"
-    url_streak = "https://streak-stats.demolab.com?user=dengyie&theme=tokyonight&hide_border=true"
+    # Primary: self-hosted instance on Huawei Cloud SG (see hw-sg ops doc).
+    # Fallbacks: public vercel instance (works intermittently, suffers
+    # DEPLOYMENT_PAUSED) — a degraded but fresh card beats a frozen README.
+    stats_sources = [
+        "https://grs.mangoqwq.com/index?username=dengyie&show_icons=true&theme=tokyonight&count_private=true&hide_border=true",
+        "https://github-readme-stats.vercel.app/api?username=dengyie&show_icons=true&theme=tokyonight&count_private=true&hide_border=true",
+    ]
+    streak_sources = [
+        "https://streak-stats.demolab.com?user=dengyie&theme=tokyonight&hide_border=true",
+        "https://streak-stats.demolab.com?user=dengyie&theme=tokyonight&hide_border=true",  # single official source; extend with a mirror here if it ever dies
+    ]
 
     try:
-        svg_stats = fetch_svg(url_stats)
-        svg_streak = fetch_svg(url_streak)
+        svg_stats, stats_src = fetch_with_fallback(stats_sources)
+        svg_streak, streak_src = fetch_with_fallback(streak_sources)
+        print(f"stats source: {stats_src}")
+        print(f"streak source: {streak_src}")
 
         # Merge into a single horizontal composite SVG (height: 195)
         # Left card (stats): width 467
