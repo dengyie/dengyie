@@ -1,0 +1,208 @@
+// github-readme-stats self-hosted shim (canonical source: dengyie/dengyie infrastructure/grs/)
+//
+// Wraps upstream Vercel serverless handlers (api/*.js, `export default async (req,res)`)
+// as a plain HTTP(S) server. Deployed to huawei-sg:/opt/github-readme-stats/server/server.mjs.
+//
+// Behaviour:
+// - req: adds .query / .cookies ; res: adds .status()/.send()/.json() (Vercel enhanced API)
+// - Route allowlist: index/pin/top-langs only (gist needs a PAT_2 pool, wakatime unused).
+// - Param allowlist: unknown query params -> 400 BEFORE any upstream/API call, so junk
+//   requests can neither pollute the cache nor burn the GitHub token quota.
+// - `t` param: reserved cache-bust for the daily workflow fetch (bypasses shim cache AND
+//   the Cloudflare edge cache, whose key includes the full query string).
+// - Error cards: upstream renders failures as SVG with HTTP 200; detected and re-sent
+//   as 503 so consumers (update-stats.yml) fail loudly instead of committing broken cards.
+// - Caching: in-memory 30min for good responses (skipped for bust requests); rate limit
+//   60 req/min/IP with opportunistic per-bucket expiry GC.
+import http from "node:http";
+import https from "node:https";
+import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const PORT = Number(process.env.PORT || 80);
+const HTTPS_PORT = Number(process.env.HTTPS_PORT || 0);
+const HOST = process.env.HOST || "0.0.0.0";
+const TOKEN_PATH = process.env.GITHUB_TOKEN_FILE || "/etc/grs/github_token";
+
+const KNOWN = new Set(["index", "pin", "top-langs"]);
+// Union of query params accepted by the three upstream cards (api/index.js, pin.js,
+// top-langs.js) + our reserved `t` cache-bust. New card params must be added here.
+const PARAM_ALLOWLIST = new Set([
+  "username", "hide", "hide_title", "hide_border", "card_width", "hide_rank",
+  "show_icons", "include_all_commits", "commits_year", "line_height",
+  "title_color", "ring_color", "icon_color", "text_color", "text_bold",
+  "bg_color", "theme", "cache_seconds", "exclude_repo", "custom_title",
+  "locale", "disable_animations", "border_radius", "number_format",
+  "number_precision", "border_color", "rank_icon", "show",
+  "repo", "show_owner", "description_lines_count",
+  "layout", "langs_count", "size_weight", "count_weight", "hide_progress",
+  "stats_format",
+  "t",
+]);
+const MAX_SEARCH_LEN = 512;
+
+const CACHE_TTL_MS = 30 * 60 * 1000;
+const CACHE_MAX = 64;
+const RATE_MAX = 60;
+const RATE_WINDOW_MS = 60 * 1000;
+
+// Token comes from a 0640 root:grs file; PAT_1 is what the upstream retryer reads.
+if (!process.env.GITHUB_TOKEN && !process.env.PAT_1) {
+  try {
+    const token = (await readFile(TOKEN_PATH, "utf8")).trim();
+    if (token) process.env.PAT_1 = token;
+  } catch {}
+}
+
+const handlers = new Map();
+function getHandler(name) {
+  if (!handlers.has(name)) {
+    // Registered lazy import; name is allowlist-validated before use.
+    handlers.set(name, import(path.join(ROOT, "api", `${name}.js`)).then((m) => m.default));
+  }
+  return handlers.get(name);
+}
+
+const cache = new Map(); // cacheKey -> {status, headers, body, at}
+const hits = new Map();  // ip -> [timestamps]
+
+function rateLimited(ip) {
+  const now = Date.now();
+  // Opportunistic GC: buckets are append-ordered, so an expired newest timestamp
+  // means the whole bucket is expired. Never resets live buckets wholesale.
+  if (hits.size > 2048) {
+    for (const [k, arr] of hits) {
+      if (arr[arr.length - 1] <= now - RATE_WINDOW_MS) hits.delete(k);
+    }
+  }
+  const arr = (hits.get(ip) || []).filter((t) => now - t < RATE_WINDOW_MS);
+  arr.push(now);
+  hits.set(ip, arr);
+  return arr.length > RATE_MAX;
+}
+
+const ERROR_MARK = "Something went wrong";
+
+function noStore(res) {
+  res.setHeader("Cache-Control", "no-store");
+}
+
+const server = http.createServer(async (req, res) => {
+  const ip = req.socket.remoteAddress || "unknown";
+  try {
+    const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+    const name = (url.pathname.split("/").filter(Boolean)[0] || "").replace(/\.js$/, "");
+    if (!/^[a-z-]+$/.test(name) || !KNOWN.has(name)) {
+      res.statusCode = 404;
+      noStore(res);
+      return res.end("Not Found");
+    }
+    if (rateLimited(ip)) {
+      res.statusCode = 429;
+      noStore(res);
+      res.setHeader("Retry-After", "60");
+      return res.end("Too Many Requests");
+    }
+
+    // Input validation gate: unknown params or oversized queries never reach the
+    // upstream handler (and thus never the GitHub API or the cache).
+    const search = url.searchParams;
+    const unknown = [...search.keys()].filter((k) => !PARAM_ALLOWLIST.has(k));
+    if (unknown.length > 0) {
+      res.statusCode = 400;
+      noStore(res);
+      return res.end(`Bad Request: unknown parameter(s): ${unknown.join(", ")}`);
+    }
+    if (url.search.length > MAX_SEARCH_LEN) {
+      res.statusCode = 400;
+      noStore(res);
+      return res.end("Bad Request: query too long");
+    }
+
+    // `t` = workflow cache-bust: bypass both cache layers, and don't cache the
+    // unique response (a new key per day would slowly churn the LRU/FIFO window).
+    const isBust = search.has("t");
+
+    const cacheKey = name + "?" + [...search.entries()].sort().map(([k, v]) => `${k}=${v}`).join("&");
+    if (!isBust) {
+      const cached = cache.get(cacheKey);
+      if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+        res.writeHead(cached.status, cached.headers);
+        return res.end(cached.body);
+      }
+    }
+
+    Object.defineProperty(req, "query", { value: Object.fromEntries(search) });
+    req.cookies = {};
+    res.status = (code) => { res.statusCode = code; return res; };
+    res.send = (body) => {
+      if (!res.writableEnded) {
+        const buf = Buffer.isBuffer(body) ? body : Buffer.from(String(body ?? ""));
+        if (buf.includes(ERROR_MARK)) {
+          console.error(`error-card: ${name} ${url.search} ip=${ip}`);
+          res.statusCode = 503;
+          noStore(res);
+          res.setHeader("Content-Type", "text/plain; charset=utf-8");
+          origEnd("upstream error card");
+          return res;
+        }
+        res.end(buf);
+      }
+      return res;
+    };
+    res.json = (obj) => {
+      if (!res.headersSent) res.setHeader("Content-Type", "application/json");
+      if (!res.writableEnded) res.end(JSON.stringify(obj));
+      return res;
+    };
+
+    // capture upstream-set headers for the cache store
+    const origSetHeader = res.setHeader.bind(res);
+    const headers = {};
+    res.setHeader = (k, v) => { headers[k.toLowerCase()] = v; return origSetHeader(k, v); };
+    let sent = null;
+    const origEnd = res.end.bind(res);
+    res.end = function (chunk, ...rest) {
+      if ((typeof chunk === "string" && chunk) || Buffer.isBuffer(chunk)) {
+        sent = sent ? Buffer.concat([sent, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]) : Buffer.from(chunk);
+      }
+      return origEnd(chunk, ...rest);
+    };
+
+    const handler = await getHandler(name);
+    await handler(req, res);
+
+    if (sent && res.statusCode === 200 && !isBust) {
+      cache.set(cacheKey, { body: sent, headers, status: 200, at: Date.now() });
+      if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
+    }
+  } catch (err) {
+    console.error("handler error:", err, `ip=${ip}`);
+    if (!res.headersSent) res.statusCode = 500;
+    noStore(res);
+    if (!res.writableEnded) res.end("Internal Server Error");
+  }
+});
+
+server.requestTimeout = 120_000;
+server.headersTimeout = 65_000;
+server.keepAliveTimeout = 30_000;
+server.connectionsCheckingInterval = 30_000;
+
+server.listen(PORT, HOST, () => console.log(`grs http on ${HOST}:${PORT}`));
+
+if (process.env.TLS_CERT && process.env.TLS_KEY && HTTPS_PORT) {
+  try {
+    const tls = { cert: readFileSync(process.env.TLS_CERT), key: readFileSync(process.env.TLS_KEY) };
+    const httpsServer = https.createServer(tls, (req, res) => server.emit("request", req, res));
+    httpsServer.requestTimeout = 120_000;
+    httpsServer.headersTimeout = 65_000;
+    httpsServer.keepAliveTimeout = 30_000;
+    httpsServer.listen(HTTPS_PORT, HOST, () => console.log(`grs https on ${HOST}:${HTTPS_PORT}`));
+  } catch (e) {
+    console.error("https disabled:", e.message);
+  }
+}

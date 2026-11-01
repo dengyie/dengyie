@@ -1,40 +1,51 @@
+import time
 import urllib.request
 import os
+
+STATS_ERROR_MARKS = ("Something went wrong",)
+STREAK_ERROR_MARKS = ("Something went wrong", "Could not find a user with that name.")
+
 
 def fetch_svg(url):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     return urllib.request.urlopen(req, timeout=15).read().decode("utf-8")
 
-def fetch_with_fallback(urls):
+
+def fetch_with_fallback(urls, error_marks):
     """Try each URL in order; reject upstream error cards (HTTP 200 but broken SVG)."""
     last_err = None
     for url in urls:
         try:
             svg = fetch_svg(url)
-            if "Something went wrong" in svg:
-                raise ValueError("upstream returned an error card")
+            for mark in error_marks:
+                if mark in svg:
+                    raise ValueError(f"upstream error card: {mark!r}")
             return svg, url
         except Exception as e:
             print(f"source failed: {url} -> {e}")
             last_err = e
     raise last_err
 
+
 def main():
     # Primary: self-hosted instance on Huawei Cloud SG (see hw-sg ops doc).
-    # Fallbacks: public vercel instance (works intermittently, suffers
+    #   &t=<epoch> busts BOTH cache layers (Cloudflare edge + shim memory cache)
+    #   so the daily workflow always gets fresh upstream data.
+    # Fallback: public vercel instance (works intermittently, suffers
     # DEPLOYMENT_PAUSED) — a degraded but fresh card beats a frozen README.
     stats_sources = [
-        "https://grs.mangoqwq.com/index?username=dengyie&show_icons=true&theme=tokyonight&count_private=true&hide_border=true",
+        "https://grs.mangoqwq.com/index?username=dengyie&show_icons=true&theme=tokyonight&count_private=true&hide_border=true"
+        f"&t={int(time.time())}",
         "https://github-readme-stats.vercel.app/api?username=dengyie&show_icons=true&theme=tokyonight&count_private=true&hide_border=true",
     ]
+    # Single official source; extend with a mirror here if it ever dies.
     streak_sources = [
         "https://streak-stats.demolab.com?user=dengyie&theme=tokyonight&hide_border=true",
-        "https://streak-stats.demolab.com?user=dengyie&theme=tokyonight&hide_border=true",  # single official source; extend with a mirror here if it ever dies
     ]
 
     try:
-        svg_stats, stats_src = fetch_with_fallback(stats_sources)
-        svg_streak, streak_src = fetch_with_fallback(streak_sources)
+        svg_stats, stats_src = fetch_with_fallback(stats_sources, STATS_ERROR_MARKS)
+        svg_streak, streak_src = fetch_with_fallback(streak_sources, STREAK_ERROR_MARKS)
         print(f"stats source: {stats_src}")
         print(f"streak source: {streak_src}")
 
@@ -62,6 +73,7 @@ def main():
     except Exception as e:
         print(f"Error generating stats SVG: {e}")
         raise e
+
 
 if __name__ == "__main__":
     main()

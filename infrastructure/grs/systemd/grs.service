@@ -1,0 +1,38 @@
+[Unit]
+Description=github-readme-stats self-hosted shim
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/github-readme-stats
+ExecStart=/usr/bin/node --max-old-space-size=160 --max-semi-space-size=8 --optimize-for-size server/server.mjs
+EnvironmentFile=/etc/grs/grs.env
+Restart=on-failure
+RestartSec=5
+
+# Dedicated non-root user; /etc/grs/* (token, env, TLS key) are root:grs 0640.
+User=grs
+Group=grs
+# Bind ports 80/443 without root; no other capability is ever needed.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+
+# Filesystem / kernel hardening. The process writes nothing to disk (logs -> journald),
+# so no ReadWritePaths is required.
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+
+# Memory ceiling (tuned: steady-state RSS ~60MB)
+MemoryHigh=220M
+MemoryMax=300M
+
+[Install]
+WantedBy=multi-user.target
