@@ -33,10 +33,13 @@ def main():
     #   so the daily workflow always gets fresh upstream data.
     # Fallback: public vercel instance (works intermittently, suffers
     # DEPLOYMENT_PAUSED) — a degraded but fresh card beats a frozen README.
+    # NOTE: count_private was dropped — it is a dead param upstream (replaced by
+    # include_all_commits years ago) and the self-hosted shim's strict allowlist
+    # rejects unknown params with 400.
     stats_sources = [
-        "https://grs.mangoqwq.com/index?username=dengyie&show_icons=true&theme=tokyonight&count_private=true&hide_border=true"
+        "https://grs.mangoqwq.com/index?username=dengyie&show_icons=true&theme=tokyonight&include_all_commits=true&hide_border=true"
         f"&t={int(time.time())}",
-        "https://github-readme-stats.vercel.app/api?username=dengyie&show_icons=true&theme=tokyonight&count_private=true&hide_border=true",
+        "https://github-readme-stats.vercel.app/api?username=dengyie&show_icons=true&theme=tokyonight&include_all_commits=true&hide_border=true",
     ]
     # Single official source; extend with a mirror here if it ever dies.
     streak_sources = [
