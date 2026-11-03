@@ -19,6 +19,7 @@
 | 分流 | `server.mjs`:Host == `streak.mangoqwq.com` → 透明代理 `127.0.0.1:8080`;PHP 的 HTTP-200 错误卡被规范成 **503 + no-store**(与 grs 错误卡同契约) |
 | TLS | `/etc/grs/cert/{cert,key}.pem` 自签证书,SAN 含 `grs.mangoqwq.com` + `streak.mangoqwq.com`(CF zone `full` 模式不校验, SAN 仅为卫生) |
 | DNS | zone `mangoqwq.com`(`d2d0fb042a3ef19ae678e03fce29c5f5`),A `streak` → 111.91.24.234(Proxied) |
+| CF 缓存 | Cache Rule(ruleset `f555b0049…`,phase `http_request_cache_settings`)表达式必须含双主机:`(http.host in {"grs.mangoqwq.com" "streak.mangoqwq.com"} and http.request.method eq "GET")`,action `cache:true + respect origin`(PHP 成功响应自带 `max-age=86400`);管理 token:vault cloud fare 账户 §mangoqwq-cache-rules-write |
 
 ## 全新部署 SOP
 
@@ -50,5 +51,5 @@ curl -sk "https://127.0.0.1/index?username=dengyie&show_icons=true" -o /dev/null
 
 ## 变更与排障记录
 
-- 2026-11-04: 首次部署。起因:`streak-stats.demolab.com` 全局 503/超时(30s×2 重试仍失败),手动 dispatch 两次失败,确认单点故障后按 grs 模式自部署。DNS 记录经 `pxed` 跳板用 CF Global Key 创建(本机 `api.cloudflare.com` TLS 不通)。
+- 2026-11-04: 首次部署(当日 review 后补:CF Cache Rule 表达式扩入本主机,`cf-cache-status` 实测 MISS→HIT;管理 token `mangoqwq-cache-rules-write`)。起因:`streak-stats.demolab.com` 全局 503/超时(30s×2 重试仍失败),手动 dispatch 两次失败,确认单点故障后按 grs 模式自部署。DNS 记录经 `pxed` 跳板用 CF Global Key 创建(本机 `api.cloudflare.com` TLS 不通)。
 - 2026-11-04: 部署踩坑两则:① unit `ReadWritePaths` 指向尚不存在的 `cache/` 会 226/NAMESPACE,加 `-` 前缀容错;② `/etc/streak` 目录默认 750 root:root,`streak` 用户无法穿越读取 `.env` 报 "env was not found",需 `chown root:streak /etc/streak`。
