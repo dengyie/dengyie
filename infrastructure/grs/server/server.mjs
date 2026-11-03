@@ -14,6 +14,9 @@
 //   as 503 so consumers (update-stats.yml) fail loudly instead of committing broken cards.
 // - Caching: in-memory 30min for good responses (skipped for bust requests); rate limit
 //   60 req/min/IP with opportunistic per-bucket expiry GC.
+// - Host routing: Host streak.mangoqwq.com is transparently proxied to the local
+//   github-readme-streak-stats PHP app (loopback :8080), bypassing grs logic; its
+//   HTTP-200 error SVGs are normalized to 503 + no-store (see handler).
 import http from "node:http";
 import https from "node:https";
 import { readFileSync } from "node:fs";
@@ -26,6 +29,19 @@ const PORT = Number(process.env.PORT || 80);
 const HTTPS_PORT = Number(process.env.HTTPS_PORT || 0);
 const HOST = process.env.HOST || "0.0.0.0";
 const TOKEN_PATH = process.env.GITHUB_TOKEN_FILE || "/etc/grs/github_token";
+
+// Host-based virtual hosting: streak.mangoqwq.com (github-readme-streak-stats,
+// PHP built-in server on loopback :8080) rides the same 80/443 listeners as grs.
+// Streak traffic is transparently proxied and BYPASSES all grs-specific logic
+// below (route allowlist, param allowlist, rate limit, in-memory cache) — the
+// PHP app has its own 24h cache and error-card rendering.
+const STREAK_HOSTS = new Set([
+  "streak.mangoqwq.com",
+  "streak.mangoqwq.com:80",
+  "streak.mangoqwq.com:443",
+]);
+const STREAK_UPSTREAM_HOST = process.env.STREAK_UPSTREAM_HOST || "127.0.0.1";
+const STREAK_UPSTREAM_PORT = Number(process.env.STREAK_UPSTREAM_PORT || 8080);
 
 const KNOWN = new Set(["index", "pin", "top-langs"]);
 // Union of query params accepted by the three upstream cards (api/index.js, pin.js,
@@ -93,6 +109,43 @@ function noStore(res) {
 const server = http.createServer(async (req, res) => {
   const ip = req.socket.remoteAddress || "unknown";
   try {
+    // streak.mangoqwq.com -> transparent proxy to the local PHP streak-stats app.
+    // The PHP app renders failures as SVG with HTTP 200 (same trap as the grs
+    // upstream error cards), so buffer and normalize them to 503 + no-store:
+    // consumers (update-stats.yml) fail loudly and CF never caches a broken card.
+    if (STREAK_HOSTS.has(String(req.headers.host || "").toLowerCase())) {
+      const upstreamReq = http.request(
+        {
+          host: STREAK_UPSTREAM_HOST,
+          port: STREAK_UPSTREAM_PORT,
+          path: req.url,
+          method: req.method,
+          headers: { ...req.headers, host: `${STREAK_UPSTREAM_HOST}:${STREAK_UPSTREAM_PORT}` },
+        },
+        (up) => {
+          const chunks = [];
+          up.on("data", (c) => chunks.push(c));
+          up.on("end", () => {
+            const body = Buffer.concat(chunks);
+            const isError =
+              up.statusCode !== 200 || body.includes("Error lable");
+            res.writeHead(
+              isError ? 503 : up.statusCode,
+              isError ? { ...up.headers, "cache-control": "no-store" } : up.headers,
+            );
+            res.end(body);
+          });
+        },
+      );
+      upstreamReq.on("error", () => {
+        res.statusCode = 503;
+        noStore(res);
+        res.end("streak upstream unavailable");
+      });
+      req.pipe(upstreamReq);
+      return;
+    }
+
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
     const name = (url.pathname.split("/").filter(Boolean)[0] || "").replace(/\.js$/, "");
     if (!/^[a-z-]+$/.test(name) || !KNOWN.has(name)) {

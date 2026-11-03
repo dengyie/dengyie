@@ -1,0 +1,32 @@
+[Unit]
+Description=github-readme-streak-stats (PHP built-in server, loopback only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/github-readme-streak-stats
+# Single-threaded built-in server is enough: one daily consumer (update-stats.yml)
+# plus occasional manual checks; the PHP app caches upstream GraphQL for 24h.
+ExecStart=/usr/bin/php -S 127.0.0.1:8080 -t src
+Restart=on-failure
+RestartSec=5
+
+# Dedicated non-root user; /etc/streak/streak.env (TOKEN) is root:streak 0640 and
+# is exposed to the app as /opt/github-readme-streak-stats/.env (symlink).
+User=streak
+Group=streak
+NoNewPrivileges=true
+MemoryHigh=100M
+MemoryMax=200M
+
+# Filesystem hardening: read-only system except the app's cache dir (the PHP app
+# writes 24h GraphQL-response cache files there).
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/github-readme-streak-stats/cache
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

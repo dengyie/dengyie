@@ -46,11 +46,14 @@ def main():
         f"&t={int(time.time())}",
         "https://github-readme-stats.vercel.app/api?username=dengyie&show_icons=true&theme=tokyonight&include_all_commits=true&hide_border=true",
     ]
-    # Single public source (SPOF): intermittently slow — mitigated only by the
-    # retry loop in fetch_with_fallback. If it ever hard-fails, deploy a
-    # self-hosted mirror on hw-sg (same pattern as grs.service) and put its URL
-    # here first.
+    # Primary: self-hosted streak-stats on hw-sg (same origin as grs, Host-routed
+    # via streak.mangoqwq.com; see infrastructure/streak/README.md). `t=` busts the
+    # Cloudflare edge; the PHP app ignores unknown params and caches GraphQL for 24h.
+    # Fallback: official public instance — recurrently 503 / very slow globally
+    # (observed 2026-11-03/04), kept only as a degraded last resort.
     streak_sources = [
+        "https://streak.mangoqwq.com?user=dengyie&theme=tokyonight&hide_border=true"
+        f"&t={int(time.time())}",
         "https://streak-stats.demolab.com?user=dengyie&theme=tokyonight&hide_border=true",
     ]
 
