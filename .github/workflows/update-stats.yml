@@ -2,7 +2,7 @@ name: Update GitHub Stats SVG
 
 on:
   schedule:
-    - cron: '0 0 * * *' # 每天 UTC 0 点自动刷新
+    - cron: '23 1 * * *' # 每天刷新;00:00 UTC 是调度高峰,实测被 GitHub 延迟 3-5h,错峰到 01:23 UTC(≈北京 09:23 + 延迟)
   workflow_dispatch:
 
 jobs:

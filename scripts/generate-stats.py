@@ -6,24 +6,29 @@ STATS_ERROR_MARKS = ("Something went wrong",)
 STREAK_ERROR_MARKS = ("Something went wrong", "Could not find a user with that name.")
 
 
-def fetch_svg(url):
+def fetch_svg(url, timeout=30):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    return urllib.request.urlopen(req, timeout=15).read().decode("utf-8")
+    return urllib.request.urlopen(req, timeout=timeout).read().decode("utf-8")
 
 
-def fetch_with_fallback(urls, error_marks):
-    """Try each URL in order; reject upstream error cards (HTTP 200 but broken SVG)."""
+def fetch_with_fallback(urls, error_marks, attempts=2):
+    """Try each URL in order (with retries per URL); reject upstream error
+    cards (HTTP 200 but broken SVG). The public streak instance routinely
+    exceeds 15 s reads (observed 2026-11-03), which killed the whole run when
+    there was a single 15 s attempt — hence timeout=30 + 2 attempts."""
     last_err = None
     for url in urls:
-        try:
-            svg = fetch_svg(url)
-            for mark in error_marks:
-                if mark in svg:
-                    raise ValueError(f"upstream error card: {mark!r}")
-            return svg, url
-        except Exception as e:
-            print(f"source failed: {url} -> {e}")
-            last_err = e
+        for attempt in range(1, attempts + 1):
+            try:
+                svg = fetch_svg(url)
+                for mark in error_marks:
+                    if mark in svg:
+                        raise ValueError(f"upstream error card: {mark!r}")
+                return svg, url
+            except Exception as e:
+                print(f"source failed (attempt {attempt}/{attempts}): {url} -> {e}")
+                last_err = e
+                time.sleep(3)
     raise last_err
 
 
@@ -41,7 +46,10 @@ def main():
         f"&t={int(time.time())}",
         "https://github-readme-stats.vercel.app/api?username=dengyie&show_icons=true&theme=tokyonight&include_all_commits=true&hide_border=true",
     ]
-    # Single official source; extend with a mirror here if it ever dies.
+    # Single public source (SPOF): intermittently slow — mitigated only by the
+    # retry loop in fetch_with_fallback. If it ever hard-fails, deploy a
+    # self-hosted mirror on hw-sg (same pattern as grs.service) and put its URL
+    # here first.
     streak_sources = [
         "https://streak-stats.demolab.com?user=dengyie&theme=tokyonight&hide_border=true",
     ]
