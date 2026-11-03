@@ -12,7 +12,7 @@
 //   the Cloudflare edge cache, whose key includes the full query string).
 // - Error cards: upstream renders failures as SVG with HTTP 200; detected and re-sent
 //   as 503 so consumers (update-stats.yml) fail loudly instead of committing broken cards.
-// - Caching: in-memory 30min for good responses (skipped for bust requests); rate limit
+// - Caching: in-memory 10min for good responses (skipped for bust requests); rate limit
 //   60 req/min/IP with opportunistic per-bucket expiry GC.
 // - Host routing: Host streak.mangoqwq.com is transparently proxied to the local
 //   github-readme-streak-stats PHP app (loopback :8080), bypassing grs logic; its
@@ -71,7 +71,9 @@ const PARAM_ALLOWLIST = new Set([
 ]);
 const MAX_SEARCH_LEN = 512;
 
-const CACHE_TTL_MS = 30 * 60 * 1000;
+// 10min, aligned with the CF edge TTL (override_origin 600s) and the streak
+// PHP cache — one coherent freshness contract across all three layers.
+const CACHE_TTL_MS = 10 * 60 * 1000;
 const CACHE_MAX = 64;
 const RATE_MAX = 60;
 const RATE_WINDOW_MS = 60 * 1000;
