@@ -42,6 +42,17 @@ const STREAK_HOSTS = new Set([
 ]);
 const STREAK_UPSTREAM_HOST = process.env.STREAK_UPSTREAM_HOST || "127.0.0.1";
 const STREAK_UPSTREAM_PORT = Number(process.env.STREAK_UPSTREAM_PORT || 8080);
+// Hop-by-hop headers per RFC 9110 §7.6.1 — stripped when proxying streak traffic.
+const HOP_BY_HOP = [
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
+];
 
 const KNOWN = new Set(["index", "pin", "top-langs"]);
 // Union of query params accepted by the three upstream cards (api/index.js, pin.js,
@@ -129,19 +140,39 @@ const server = http.createServer(async (req, res) => {
             const body = Buffer.concat(chunks);
             const isError =
               up.statusCode !== 200 || body.includes("Error lable");
-            res.writeHead(
-              isError ? 503 : up.statusCode,
-              isError ? { ...up.headers, "cache-control": "no-store" } : up.headers,
-            );
+            // Hop-by-hop headers never cross a proxy boundary; content-length is
+            // restated for the exact buffered body. Error responses additionally
+            // lose every cache qualifier (the PHP app sets max-age=86400 BEFORE
+            // its catch-path error rendering — an error card must never be
+            // cached by CF, so 503 + no-store + no expires/last-modified).
+            const headers = { ...up.headers };
+            for (const h of HOP_BY_HOP) delete headers[h];
+            headers["content-length"] = String(body.length);
+            if (isError) {
+              headers["cache-control"] = "no-store";
+              delete headers.expires;
+              delete headers["last-modified"];
+            }
+            res.writeHead(isError ? 503 : up.statusCode, headers);
             res.end(body);
           });
         },
       );
+      // Fail loudly before CF's ~100s 524: a stalled PHP (e.g. GitHub GraphQL
+      // hang) must become a clean 503 the workflow can retry/fallback on.
+      upstreamReq.setTimeout(55_000, () =>
+        upstreamReq.destroy(new Error("streak upstream timeout")),
+      );
       upstreamReq.on("error", () => {
+        if (res.headersSent) {
+          res.destroy();
+          return;
+        }
         res.statusCode = 503;
         noStore(res);
         res.end("streak upstream unavailable");
       });
+      req.on("aborted", () => upstreamReq.destroy());
       req.pipe(upstreamReq);
       return;
     }

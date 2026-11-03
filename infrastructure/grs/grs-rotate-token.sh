@@ -30,8 +30,10 @@ chown root:grs "$TOKEN_FILE.new"
 chmod 640 "$TOKEN_FILE.new"
 mv "$TOKEN_FILE.new" "$TOKEN_FILE"
 
-# streak-stats: env file with TOKEN= plus the WHITELIST line (idempotent rewrite).
-printf 'TOKEN=%s\nWHITELIST=dengyie\n' "$NEW_TOKEN" > "$STREAK_ENV.new"
+# streak-stats: env file with TOKEN= plus the WHITELIST line. Preserve any
+# WHITELIST edit made directly on the VPS instead of silently reverting it.
+WHITELIST=$(grep -m1 '^WHITELIST=' "$STREAK_ENV" 2>/dev/null | cut -d= -f2- || true)
+printf 'TOKEN=%s\nWHITELIST=%s\n' "$NEW_TOKEN" "${WHITELIST:-dengyie}" > "$STREAK_ENV.new"
 chown root:streak "$STREAK_ENV.new"
 chmod 640 "$STREAK_ENV.new"
 mv "$STREAK_ENV.new" "$STREAK_ENV"

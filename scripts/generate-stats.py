@@ -3,7 +3,14 @@ import urllib.request
 import os
 
 STATS_ERROR_MARKS = ("Something went wrong",)
-STREAK_ERROR_MARKS = ("Something went wrong", "Could not find a user with that name.")
+# "Error lable" is the (misspelled) comment the streak app puts in every error
+# card — belt-and-braces alongside the human-readable strings, so a 200 error
+# card is rejected even if its message text ever changes.
+STREAK_ERROR_MARKS = (
+    "Something went wrong",
+    "Could not find a user with that name.",
+    "Error lable",
+)
 
 
 def fetch_svg(url, timeout=30):
@@ -28,7 +35,8 @@ def fetch_with_fallback(urls, error_marks, attempts=2):
             except Exception as e:
                 print(f"source failed (attempt {attempt}/{attempts}): {url} -> {e}")
                 last_err = e
-                time.sleep(3)
+                if attempt < attempts:
+                    time.sleep(3)
     raise last_err
 
 
