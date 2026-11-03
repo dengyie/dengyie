@@ -21,6 +21,18 @@
 | DNS | zone `mangoqwq.com`(`d2d0fb042a3ef19ae678e03fce29c5f5`),A `streak` → 111.91.24.234(Proxied) |
 | CF 缓存 | Cache Rule(ruleset `f555b0049…`,phase `http_request_cache_settings`)表达式必须含双主机:`(http.host in {"grs.mangoqwq.com" "streak.mangoqwq.com"} and http.request.method eq "GET")`,action `cache:true + respect origin`(PHP 成功响应自带 `max-age=86400`);管理 token:vault cloud fare 账户 §mangoqwq-cache-rules-write |
 
+## 上游补丁(hw-sg 特有,升级后需重打)
+
+`src/cache.php` 的 `CACHE_DURATION` 上游硬编码 24h,已改为 **10 分钟**(与 CF 边缘 TTL、grs shim 内存缓存对齐,统一 10min 新鲜度契约)。全新部署后执行:
+
+```bash
+sed -i 's|define("CACHE_DURATION", 24 \* 60 \* 60);|define("CACHE_DURATION", 10 * 60); // hw-sg patch: 10min, aligned with CF edge + grs shim TTL|' /opt/github-readme-streak-stats/src/cache.php
+chown streak:streak /opt/github-readme-streak-stats/src/cache.php
+systemctl restart streak-stats
+```
+
+配额影响评估:workflow 的 `t=<epoch>` 本就绕过 PHP 缓存键(1 次 GraphQL/天);直接访客近乎为零且共享同一缓存键,10min TTL 下的 GraphQL 调用量相对 5000/hr 上限可忽略。
+
 ## 全新部署 SOP
 
 ```bash
