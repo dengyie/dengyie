@@ -12,7 +12,7 @@
         aria-labelledby="descId"
       >
         <title id="titleId">mango's GitHub Stats, Rank: A</title>
-        <desc id="descId">Total Stars Earned: 548, Total Commits  : 13655, Total PRs: 372, Total Issues: 40, Contributed to (last year): 3</desc>
+        <desc id="descId">Total Stars Earned: 548, Total Commits  : 13656, Total PRs: 372, Total Issues: 40, Contributed to (last year): 3</desc>
         <style>
           .header {
             font: 600 18px 'Segoe UI', Ubuntu, Sans-Serif;
@@ -76,7 +76,7 @@
         stroke-dashoffset: 251.32741228718345;
       }
       to {
-        stroke-dashoffset: 36.31034244698785;
+        stroke-dashoffset: 36.31034019690263;
       }
     }
   
@@ -271,7 +271,7 @@
                 <!-- Total Contributions big number -->
                 <g transform='translate(82.5, 48)'>
                     <text x='0' y='32' stroke-width='0' text-anchor='middle' fill='#70A5FD' stroke='none' font-family='"Segoe UI", Ubuntu, sans-serif' font-weight='700' font-size='28px' font-style='normal' style='opacity: 0; animation: fadein 0.5s linear forwards 0.6s'>
-                        17,799
+                        17,813
                     </text>
                 </g>
 
