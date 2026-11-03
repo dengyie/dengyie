@@ -5,6 +5,13 @@ on:
     - cron: '23 1 * * *' # 每天刷新;00:00 UTC 是调度高峰,实测被 GitHub 延迟 3-5h,错峰到 01:23 UTC(≈北京 09:23 + 延迟)
   workflow_dispatch:
 
+# Overlapping runs (schedule + manual dispatch) would both generate from their
+# checkout base; the loser's push is rejected non-fast-forward and the run is
+# marked failed. Serialize instead — latest wins, no failure noise.
+concurrency:
+  group: update-stats
+  cancel-in-progress: false
+
 jobs:
   update-stats:
     runs-on: ubuntu-latest

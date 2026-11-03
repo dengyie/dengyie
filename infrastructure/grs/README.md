@@ -15,7 +15,7 @@ VPS huawei-sg /opt/github-readme-stats  (systemd grs.service, 用户 grs)
   │  - 路由白名单 index/pin/top-langs (其余 404)
   │  - 参数白名单 (未知参数 400, 查询串 >512 400)
   │  - 限流 60 req/min/IP (桶级过期 GC, 不整体清空)
-  │  - 内存缓存 30min/64条 (t= 跳过读写)
+  │  - 内存缓存 10min/64条 (t= 跳过读写;2026-11-04 从 30min 对齐 CF 边缘/PHP 的统一 10min 新鲜度契约)
   │  - 上游错误卡片(SVG 200)检测 → 改写 503 + no-store
   │  - token 从 /etc/grs/github_token (root:grs 0640) 读入 PAT_1
   ▼

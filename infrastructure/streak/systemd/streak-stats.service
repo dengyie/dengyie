@@ -8,7 +8,9 @@ Type=simple
 WorkingDirectory=/opt/github-readme-streak-stats
 # Single-threaded built-in server is enough: one daily consumer (update-stats.yml)
 # plus occasional manual checks; the PHP app caches upstream GraphQL for 24h.
-ExecStart=/usr/bin/php -S 127.0.0.1:8080 -t src
+# display_errors off: php -S defaults to On, which would leak stack traces and
+# server paths into HTTP responses on uncaught errors.
+ExecStart=/usr/bin/php -d display_errors=0 -d log_errors=1 -S 127.0.0.1:8080 -t src
 Restart=on-failure
 RestartSec=5
 
@@ -17,6 +19,8 @@ RestartSec=5
 User=streak
 Group=streak
 NoNewPrivileges=true
+# PHP binds an unprivileged loopback port and needs no capabilities at all.
+CapabilityBoundingSet=
 MemoryHigh=100M
 MemoryMax=200M
 

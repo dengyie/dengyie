@@ -17,12 +17,17 @@
 // - Host routing: Host streak.mangoqwq.com is transparently proxied to the local
 //   github-readme-streak-stats PHP app (loopback :8080), bypassing grs logic; its
 //   HTTP-200 error SVGs are normalized to 503 + no-store (see handler).
+// - Streak request governance: query-param allowlist (400 on unknowns) + per-client
+//   rate limit. The PHP app derives its GraphQL cache key from four free-form
+//   params, so un-governed URL variance = unauthenticated upstream-API burn.
+// - Rate-limit key: Cloudflare client IP (cf-connecting-ip, trustworthy at the
+//   origin) with socket remoteAddress as fallback.
 import http from "node:http";
 import https from "node:https";
 import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = Number(process.env.PORT || 80);
@@ -42,6 +47,18 @@ const STREAK_HOSTS = new Set([
 ]);
 const STREAK_UPSTREAM_HOST = process.env.STREAK_UPSTREAM_HOST || "127.0.0.1";
 const STREAK_UPSTREAM_PORT = Number(process.env.STREAK_UPSTREAM_PORT || 8080);
+const STREAK_TIMEOUT_MS = Number(process.env.STREAK_UPSTREAM_TIMEOUT_MS || 55_000);
+// Display-affecting params only. Deliberately absent:
+//   - `t`: never enters the PHP cache key (generator.php pins the key to
+//     starting_year/mode/exclude_days/timezone) — stripping it collapses the
+//     workflow's bust-fetch onto the shared upstream key at zero cost.
+//   - the four cache-key params above: attacker-variance vectors; each unique
+//     value forced a real GraphQL fetch (live-verified 2026-11-04). Re-add a
+//     param only together with a cache-key rationale.
+const STREAK_PARAM_ALLOWLIST = new Set([
+  "user", "theme", "hide_border", "hide_total_contributions",
+  "hide_longest_streak", "hide_current_streak", "locale",
+]);
 // Hop-by-hop headers per RFC 9110 §7.6.1 — stripped when proxying streak traffic.
 const HOP_BY_HOP = [
   "connection",
@@ -119,19 +136,54 @@ function noStore(res) {
   res.setHeader("Cache-Control", "no-store");
 }
 
-const server = http.createServer(async (req, res) => {
-  const ip = req.socket.remoteAddress || "unknown";
+async function handleRequest(req, res) {
+  // Rate-limit key: prefer Cloudflare's client IP (CF overwrites this header, so
+  // it is trustworthy at the origin). The socket peer is a CF colo exit —
+  // bucketing on it lumps many clients (and attackers) into one quota.
+  const cfIp = req.headers["cf-connecting-ip"];
+  const ip = (typeof cfIp === "string" && cfIp) || req.socket.remoteAddress || "unknown";
   try {
-    // streak.mangoqwq.com -> transparent proxy to the local PHP streak-stats app.
-    // The PHP app renders failures as SVG with HTTP 200 (same trap as the grs
-    // upstream error cards), so buffer and normalize them to 503 + no-store:
-    // consumers (update-stats.yml) fail loudly and CF never caches a broken card.
+    // streak.mangoqwq.com -> reverse proxy to the local PHP streak-stats app.
+    // Request governance mirrors the grs path below: the upstream app derives
+    // its GraphQL cache key from four attacker-controllable free-form params
+    // (generator.php: starting_year/mode/exclude_days/timezone — live-verified
+    // 2026-11-04 that two distinct timezones force two upstream fetches), so
+    // ungoverned URL variance is unauthenticated upstream-API burn plus unbounded
+    // cache-file growth (clearExpiredCache has no callers upstream). Therefore:
+    // unknown params -> 400; `t` stripped; cache-key params stay out of the
+    // allowlist; per-client rate limit; upstream path rebuilt in canonical form.
+    // The PHP app still renders failures as SVG with HTTP 200 (same trap as the
+    // grs upstream error cards), so responses are buffered and error cards are
+    // normalized to 503 + no-store: consumers (update-stats.yml) fail loudly and
+    // CF never caches a broken card.
     if (STREAK_HOSTS.has(String(req.headers.host || "").toLowerCase())) {
+      const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+      // `t` is tolerated and silently dropped (workflow cache-bust convention,
+      // no PHP-side effect); every other unknown param is a hard 400.
+      const unknown = [...url.searchParams.keys()].filter((k) => !STREAK_PARAM_ALLOWLIST.has(k) && k !== "t");
+      if (unknown.length > 0) {
+        res.statusCode = 400;
+        noStore(res);
+        return res.end(`Bad Request: unknown parameter(s): ${unknown.join(", ")}`);
+      }
+      if (rateLimited(ip)) {
+        res.statusCode = 429;
+        noStore(res);
+        res.setHeader("Retry-After", "60");
+        return res.end("Too Many Requests");
+      }
+      // Forward only allowlisted params in canonical order: the upstream sees a
+      // single stable URL for every variant of the same logical request.
+      const forward = new URL("https://streak.invalid/");
+      for (const k of STREAK_PARAM_ALLOWLIST) {
+        const v = url.searchParams.get(k);
+        if (v !== null) forward.searchParams.set(k, v);
+      }
       const upstreamReq = http.request(
         {
           host: STREAK_UPSTREAM_HOST,
           port: STREAK_UPSTREAM_PORT,
-          path: req.url,
+          path: `${forward.pathname}${forward.search}`,
           method: req.method,
           headers: { ...req.headers, host: `${STREAK_UPSTREAM_HOST}:${STREAK_UPSTREAM_PORT}` },
         },
@@ -162,7 +214,7 @@ const server = http.createServer(async (req, res) => {
       );
       // Fail loudly before CF's ~100s 524: a stalled PHP (e.g. GitHub GraphQL
       // hang) must become a clean 503 the workflow can retry/fallback on.
-      upstreamReq.setTimeout(55_000, () =>
+      upstreamReq.setTimeout(STREAK_TIMEOUT_MS, () =>
         upstreamReq.destroy(new Error("streak upstream timeout")),
       );
       upstreamReq.on("error", () => {
@@ -271,24 +323,36 @@ const server = http.createServer(async (req, res) => {
     noStore(res);
     if (!res.writableEnded) res.end("Internal Server Error");
   }
+}
+
+const server = http.createServer((req, res) => {
+  handleRequest(req, res).catch((err) => console.error("handler rejection:", err));
 });
+
+// Exposed for node:test — the tests drive handleRequest directly against mock
+// req/res and a local mock upstream; __rateBuckets lets them reset limiter state.
+export { handleRequest, hits as __rateBuckets };
 
 server.requestTimeout = 120_000;
 server.headersTimeout = 65_000;
 server.keepAliveTimeout = 30_000;
 server.connectionsCheckingInterval = 30_000;
 
-server.listen(PORT, HOST, () => console.log(`grs http on ${HOST}:${PORT}`));
+// Auto-start only when executed directly (systemd), never on import (tests).
+const IS_MAIN = Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (IS_MAIN) {
+  server.listen(PORT, HOST, () => console.log(`grs http on ${HOST}:${PORT}`));
 
-if (process.env.TLS_CERT && process.env.TLS_KEY && HTTPS_PORT) {
-  try {
-    const tls = { cert: readFileSync(process.env.TLS_CERT), key: readFileSync(process.env.TLS_KEY) };
-    const httpsServer = https.createServer(tls, (req, res) => server.emit("request", req, res));
-    httpsServer.requestTimeout = 120_000;
-    httpsServer.headersTimeout = 65_000;
-    httpsServer.keepAliveTimeout = 30_000;
-    httpsServer.listen(HTTPS_PORT, HOST, () => console.log(`grs https on ${HOST}:${HTTPS_PORT}`));
-  } catch (e) {
-    console.error("https disabled:", e.message);
+  if (process.env.TLS_CERT && process.env.TLS_KEY && HTTPS_PORT) {
+    try {
+      const tls = { cert: readFileSync(process.env.TLS_CERT), key: readFileSync(process.env.TLS_KEY) };
+      const httpsServer = https.createServer(tls, (req, res) => server.emit("request", req, res));
+      httpsServer.requestTimeout = 120_000;
+      httpsServer.headersTimeout = 65_000;
+      httpsServer.keepAliveTimeout = 30_000;
+      httpsServer.listen(HTTPS_PORT, HOST, () => console.log(`grs https on ${HOST}:${HTTPS_PORT}`));
+    } catch (e) {
+      console.error("https disabled:", e.message);
+    }
   }
 }

@@ -31,7 +31,15 @@ chown streak:streak /opt/github-readme-streak-stats/src/cache.php
 systemctl restart streak-stats
 ```
 
-配额影响评估:workflow 的 `t=<epoch>` 本就绕过 PHP 缓存键(1 次 GraphQL/天);直接访客近乎为零且共享同一缓存键,10min TTL 下的 GraphQL 调用量相对 5000/hr 上限可忽略。
+配额影响评估(2026-11-04 实弹勘误):PHP 缓存键由 `generator.php` 固定为 4 个参数(starting_year/mode/exclude_days/timezone),**`t=` 不进缓存键**——此前"t 绕过 PHP 缓存"的说法有误。每日新鲜度的真实保障是上游 `statsMissingOrStale` 按天判陈旧(卡片日期早于今天即强制回源)+ 10min TTL。workflow 每天恰 1 次回源取数,直连访客近乎为零且共享同一缓存键,GraphQL 调用量相对 5000/hr 上限可忽略。⚠️ 同理,缓存键 4 参数是攻击者可控方差向量——shim 侧已用参数白名单封死(见下节)。
+
+## 请求治理(shim 侧,2026-11-04 P1 根因修复)
+
+streak 端点此前无任何请求治理,循环 `?user=dengyie&timezone=<唯一合法值>` 即可逐请求打穿 GraphQL 配额(实弹复现:2 个时区 → +2 缓存文件)。现由 `server.mjs` streak 分支统一治理,与 grs 路径同款机制:
+
+1. **参数白名单**:`user/theme/hide_border/hide_total_contributions/hide_longest_streak/hide_current_streak/locale`,未知参数 400 并点名;`t=` 静默剥离(不进 PHP 缓存键,剥离后 workflow 与访客共享同一上游键);缓存键 4 参数(`starting_year/mode/exclude_days/timezone`)**刻意不入白名单**(方差向量,需要时须连同缓存键论证一起评估)
+2. **限流**:60 req/min/**客户端 IP**(键取 `cf-connecting-ip`,CF 回源时覆写、可信;socket 对端是 colo 出口 IP,不作键)——grs 路径同步受益
+3. **规范化转发**:上游只见白名单参数按固定顺序重建的单一 URL,攻击者 URL 方差在上游完全坍缩
 
 ## 全新部署 SOP
 
