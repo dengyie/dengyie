@@ -25,7 +25,8 @@ jobs:
 
       # grs shim: route governance, error-card normalization, rate limiting
       - name: node tests (server.mjs)
-        run: node --test infrastructure/grs/server/
+        # explicit file: node 22 --test does not glob directories
+        run: node --test infrastructure/grs/server/server.test.mjs
 
       # generate-stats.py: fallback chain, error-card rejection, retry backoff
       - name: python tests (generate-stats.py)
