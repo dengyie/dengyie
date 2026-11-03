@@ -30,6 +30,7 @@ cd /opt/github-readme-streak-stats && COMPOSER_ALLOW_SUPERUSER=1 composer instal
 useradd --system --no-create-home --shell /usr/sbin/nologin streak
 chown -R streak:streak /opt/github-readme-streak-stats
 mkdir -m 750 /etc/streak
+chown root:streak /etc/streak  # 目录组必须可穿越,否则 .env 读不到(Permission denied)
 printf 'TOKEN=%s\nWHITELIST=dengyie\n' "$(cat /etc/grs/github_token)" > /etc/streak/streak.env
 chown root:streak /etc/streak/streak.env && chmod 640 /etc/streak/streak.env
 ln -s /etc/streak/streak.env /opt/github-readme-streak-stats/.env
@@ -50,3 +51,4 @@ curl -sk "https://127.0.0.1/index?username=dengyie&show_icons=true" -o /dev/null
 ## 变更与排障记录
 
 - 2026-11-04: 首次部署。起因:`streak-stats.demolab.com` 全局 503/超时(30s×2 重试仍失败),手动 dispatch 两次失败,确认单点故障后按 grs 模式自部署。DNS 记录经 `pxed` 跳板用 CF Global Key 创建(本机 `api.cloudflare.com` TLS 不通)。
+- 2026-11-04: 部署踩坑两则:① unit `ReadWritePaths` 指向尚不存在的 `cache/` 会 226/NAMESPACE,加 `-` 前缀容错;② `/etc/streak` 目录默认 750 root:root,`streak` 用户无法穿越读取 `.env` 报 "env was not found",需 `chown root:streak /etc/streak`。

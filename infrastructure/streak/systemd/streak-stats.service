@@ -21,11 +21,13 @@ MemoryHigh=100M
 MemoryMax=200M
 
 # Filesystem hardening: read-only system except the app's cache dir (the PHP app
-# writes 24h GraphQL-response cache files there).
+# writes 24h GraphQL-response cache files there). The `-` prefix tolerates the
+# dir not existing yet (the app mkdirs it on first write) — without it a missing
+# path makes the unit die with 226/NAMESPACE.
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/opt/github-readme-streak-stats/cache
+ReadWritePaths=-/opt/github-readme-streak-stats/cache
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
 [Install]
