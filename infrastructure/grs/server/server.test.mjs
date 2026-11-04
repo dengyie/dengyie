@@ -12,7 +12,8 @@ import http from "node:http";
 // --- mock upstream (must exist before server.mjs is imported: it reads
 // STREAK_UPSTREAM_PORT / STREAK_UPSTREAM_TIMEOUT_MS at module load) ---------
 const captured = { url: undefined, count: 0 };
-let upstreamBehavior = () => ({ status: 200, headers: {}, body: "<svg>ok</svg>" });
+const DEFAULT_BEHAVIOR = () => ({ status: 200, headers: {}, body: "<svg>ok</svg>" });
+let upstreamBehavior = DEFAULT_BEHAVIOR;
 
 const upstream = http.createServer((req, res) => {
   captured.url = req.url;
@@ -101,15 +102,31 @@ test("streak: cache-key param refused with 400 and never reaches upstream", asyn
   assert.equal(captured.count, before, "upstream must not be contacted");
 });
 
-test("streak: display params forwarded sorted, t= stripped", async () => {
+test("streak: display params forwarded, t= stripped", async () => {
   const before = captured.count;
   const res = await invoke(
     makeReq({ ...STREAK_HOST, url: "/?theme=tokyonight&t=1793728175&user=dengyie&hide_border=true", headers: freshIp("f1") }),
   );
   assert.equal(res.statusCode, 200);
   assert.equal(captured.count, before + 1);
-  assert.equal(captured.url, "/?hide_border=true&theme=tokyonight&user=dengyie", "sorted, no t");
+  assert.equal(captured.url, "/?theme=tokyonight&user=dengyie&hide_border=true", "no t");
   assert.equal(String(res.body), "<svg>ok</svg>");
+});
+
+test("streak: client path is pinned to / (PHP docroot never exposed)", async () => {
+  const before = captured.count;
+  const res = await invoke(makeReq({ ...STREAK_HOST, url: "/demo/?user=dengyie", headers: freshIp("p1") }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(captured.count, before + 1);
+  assert.ok(captured.url.startsWith("/?"), `upstream path must stay /, got ${captured.url}`);
+});
+
+test("streak: upstream 4xx passes through as 4xx with no-store", async () => {
+  upstreamBehavior = () => ({ status: 404, headers: {}, body: "<title>404 Not Found</title>" });
+  const res = await invoke(makeReq({ ...STREAK_HOST, url: "/?user=dengyie", headers: freshIp("e3") }));
+  assert.equal(res.statusCode, 404, "client error must not be relabelled 503");
+  assert.equal(res.headers["cache-control"], "no-store");
+  upstreamBehavior = DEFAULT_BEHAVIOR;
 });
 
 test("streak: an unlisted display param still passes through (no allowlist to maintain)", async () => {

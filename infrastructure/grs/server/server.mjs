@@ -140,11 +140,12 @@ async function handleRequest(req, res) {
   const ip = (typeof cfIp === "string" && cfIp) || req.socket.remoteAddress || "unknown";
   try {
     // streak.mangoqwq.com -> reverse proxy to the local PHP streak-stats app.
-    // Two things are worth code here: the refusal of the four cache-key params
-    // (see STREAK_CACHE_KEY_PARAMS) and error-card normalization. Failures are
-    // rendered as SVG with HTTP 200 (same trap as the grs error cards), so
-    // responses are buffered and turned into 503 + no-store: consumers
-    // (update-stats.yml) fail loudly and CF never caches a broken card.
+    // Three things are worth code here: the refusal of the four cache-key params
+    // (see STREAK_CACHE_KEY_PARAMS), pinning the upstream path, and error
+    // normalization. Failures are rendered as SVG with HTTP 200 (same trap as
+    // the grs error cards), so responses are buffered and turned into 503 +
+    // no-store: consumers (update-stats.yml) fail loudly and CF never caches a
+    // broken card.
     if (STREAK_HOSTS.has(String(req.headers.host || "").toLowerCase())) {
       const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
       // `t` is the workflow's cache-bust convention; it has no PHP-side effect.
@@ -161,14 +162,14 @@ async function handleRequest(req, res) {
         res.setHeader("Retry-After", "60");
         return res.end("Too Many Requests");
       }
-      // Fixed param order so one logical request maps to exactly one CF edge
-      // cache key no matter how the caller ordered its params.
-      url.searchParams.sort();
       const upstreamReq = http.request(
         {
           host: STREAK_UPSTREAM_HOST,
           port: STREAK_UPSTREAM_PORT,
-          path: `${url.pathname}${url.search}`,
+          // The path is pinned: only index.php is meant to be reachable. Client
+          // paths must never reach the PHP docroot (src/demo/ and every other
+          // static file there would otherwise become public and CF-cached).
+          path: `/${url.search}`,
           method: req.method,
           headers: { ...req.headers, host: `${STREAK_UPSTREAM_HOST}:${STREAK_UPSTREAM_PORT}` },
         },
@@ -177,22 +178,28 @@ async function handleRequest(req, res) {
           up.on("data", (c) => chunks.push(c));
           up.on("end", () => {
             const body = Buffer.concat(chunks);
-            const isError =
-              up.statusCode !== 200 || body.includes("Error lable");
+            // The PHP app renders failures as SVG with HTTP 200, so a 200 with
+            // the error label is a failure; a real 5xx is a failure too. Both
+            // become 503 so consumers (update-stats.yml) fail loudly instead of
+            // committing a broken card. Client errors (4xx) and redirects pass
+            // through untouched: relabelling them 503 would claim the service
+            // is down when the caller simply asked for something wrong.
+            const failed =
+              up.statusCode >= 500 || (up.statusCode === 200 && body.includes("Error lable"));
+            const status = failed ? 503 : up.statusCode;
             // Hop-by-hop headers never cross a proxy boundary; content-length is
-            // restated for the exact buffered body. Error responses additionally
-            // lose every cache qualifier (the PHP app sets max-age=86400 BEFORE
-            // its catch-path error rendering — an error card must never be
-            // cached by CF, so 503 + no-store + no expires/last-modified).
+            // restated for the exact buffered body. Non-200 responses additionally
+            // lose every cache qualifier (the PHP app sets max-age BEFORE its
+            // catch-path error rendering — an error must never be cached by CF).
             const headers = { ...up.headers };
             for (const h of HOP_BY_HOP) delete headers[h];
             headers["content-length"] = String(body.length);
-            if (isError) {
+            if (status !== 200) {
               headers["cache-control"] = "no-store";
               delete headers.expires;
               delete headers["last-modified"];
             }
-            res.writeHead(isError ? 503 : up.statusCode, headers);
+            res.writeHead(status, headers);
             res.end(body);
           });
         },

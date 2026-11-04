@@ -39,7 +39,7 @@ streak 端点此前无任何请求治理,循环 `?user=dengyie&timezone=<唯一�
 
 1. **拒收缓存键参数**:命中 PHP GraphQL 缓存键的 4 个参数(`starting_year/mode/exclude_days/timezone`)一律 400 并点名——它们是唯一能放大上游调用的方差向量,拒收即封死;`t=` 静默剥离(不进 PHP 缓存键,剥离后 workflow 与访客共享同一上游键)。**其余参数(theme/hide_*/locale 及未来新增的展示参数)原样放行**,所以加卡面选项不需要改 shim。
 2. **限流**:60 req/min/**客户端 IP**(键取 `cf-connecting-ip`,CF 回源时覆写、可信;socket 对端是 colo 出口 IP,不作键)——grs 路径同步受益
-3. **规范化转发**:参数排序后转发,同一逻辑请求只产生一个上游 URL / 一个 CF 边缘缓存键
+3. **路径钉死 `/`**:上游路径恒为 `/`(只暴露 index.php),客户端路径不进入 PHP docroot——否则 `src/demo/` 等静态文件会随 CF 边缘缓存一并对外;`t=` 之外的其余参数原样转发。**状态码语义**:PHP 的 HTTP-200 错误卡与 5xx 规范成 503 + no-store;4xx/3xx 原样透传(客户端请求错了不能被说成服务挂了)
 
 ## 全新部署 SOP
 
