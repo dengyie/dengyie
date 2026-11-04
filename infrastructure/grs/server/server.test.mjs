@@ -92,24 +92,34 @@ function freshIp(tag) {
 const STREAK_HOST = { host: "streak.mangoqwq.com" };
 const GRS_HOST = { host: "grs.mangoqwq.com" };
 
-test("streak: unknown query param is rejected with 400 and never reaches upstream", async () => {
+test("streak: cache-key param refused with 400 and never reaches upstream", async () => {
   const before = captured.count;
   const res = await invoke(makeReq({ ...STREAK_HOST, url: "/?user=dengyie&timezone=Asia/Tokyo", headers: freshIp("u1") }));
   assert.equal(res.statusCode, 400);
-  assert.match(String(res.body), /unknown parameter\(s\): timezone/);
+  assert.match(String(res.body), /unsupported parameter\(s\): timezone/);
   assert.equal(res.headers["cache-control"], "no-store");
   assert.equal(captured.count, before, "upstream must not be contacted");
 });
 
-test("streak: allowlisted params forwarded in canonical order, t= stripped", async () => {
+test("streak: display params forwarded sorted, t= stripped", async () => {
   const before = captured.count;
   const res = await invoke(
     makeReq({ ...STREAK_HOST, url: "/?theme=tokyonight&t=1793728175&user=dengyie&hide_border=true", headers: freshIp("f1") }),
   );
   assert.equal(res.statusCode, 200);
   assert.equal(captured.count, before + 1);
-  assert.equal(captured.url, "/?user=dengyie&theme=tokyonight&hide_border=true", "rebuilt path: allowlist order, no t");
+  assert.equal(captured.url, "/?hide_border=true&theme=tokyonight&user=dengyie", "sorted, no t");
   assert.equal(String(res.body), "<svg>ok</svg>");
+});
+
+test("streak: an unlisted display param still passes through (no allowlist to maintain)", async () => {
+  const before = captured.count;
+  const res = await invoke(
+    makeReq({ ...STREAK_HOST, url: "/?user=dengyie&hide_week_days=true", headers: freshIp("f2") }),
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(captured.count, before + 1);
+  assert.match(captured.url, /hide_week_days=true/);
 });
 
 test("streak: hop-by-hop headers stripped, content-length restated", async () => {

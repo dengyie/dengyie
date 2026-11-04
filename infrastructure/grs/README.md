@@ -8,7 +8,7 @@
 GitHub README/dengyie 仓库 workflow (update-stats.yml)
   │  generate-stats.py: 带 &t=<epoch> 破缓存参数
   ▼
-Cloudflare 边缘缓存 (24h, respect origin; &t= 天然绕过)
+Cloudflare 边缘缓存 (10min, override_origin 600s; &t= 天然绕过)
   ▼
 VPS huawei-sg /opt/github-readme-stats  (systemd grs.service, 用户 grs)
   │  server/server.mjs shim:

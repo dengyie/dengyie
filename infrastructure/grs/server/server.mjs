@@ -17,9 +17,9 @@
 // - Host routing: Host streak.mangoqwq.com is transparently proxied to the local
 //   github-readme-streak-stats PHP app (loopback :8080), bypassing grs logic; its
 //   HTTP-200 error SVGs are normalized to 503 + no-store (see handler).
-// - Streak request governance: query-param allowlist (400 on unknowns) + per-client
-//   rate limit. The PHP app derives its GraphQL cache key from four free-form
-//   params, so un-governed URL variance = unauthenticated upstream-API burn.
+// - Streak request governance: refuse the four params that feed the PHP app's
+//   GraphQL cache key (any other param is forwarded untouched) + per-client
+//   rate limit. Ungoverned URL variance there is unauthenticated API burn.
 // - Rate-limit key: Cloudflare client IP (cf-connecting-ip, trustworthy at the
 //   origin) with socket remoteAddress as fallback.
 import http from "node:http";
@@ -48,17 +48,13 @@ const STREAK_HOSTS = new Set([
 const STREAK_UPSTREAM_HOST = process.env.STREAK_UPSTREAM_HOST || "127.0.0.1";
 const STREAK_UPSTREAM_PORT = Number(process.env.STREAK_UPSTREAM_PORT || 8080);
 const STREAK_TIMEOUT_MS = Number(process.env.STREAK_UPSTREAM_TIMEOUT_MS || 55_000);
-// Display-affecting params only. Deliberately absent:
-//   - `t`: never enters the PHP cache key (generator.php pins the key to
-//     starting_year/mode/exclude_days/timezone) — stripping it collapses the
-//     workflow's bust-fetch onto the shared upstream key at zero cost.
-//   - the four cache-key params above: attacker-variance vectors; each unique
-//     value forced a real GraphQL fetch (live-verified 2026-11-04). Re-add a
-//     param only together with a cache-key rationale.
-const STREAK_PARAM_ALLOWLIST = new Set([
-  "user", "theme", "hide_border", "hide_total_contributions",
-  "hide_longest_streak", "hide_current_streak", "locale",
-]);
+// The PHP app's GraphQL cache key is user + exactly these four params
+// (generator.php, live-verified 2026-11-04: two distinct timezones force two
+// upstream fetches). Each distinct value is therefore a real GitHub API call
+// and a new cache file, so they are refused rather than collapsed. This short
+// refuse-list is the whole of the streak governance: every *display* param is
+// forwarded untouched, so new card options need no edit here.
+const STREAK_CACHE_KEY_PARAMS = ["starting_year", "mode", "exclude_days", "timezone"];
 // Hop-by-hop headers per RFC 9110 §7.6.1 — stripped when proxying streak traffic.
 const HOP_BY_HOP = [
   "connection",
@@ -144,27 +140,20 @@ async function handleRequest(req, res) {
   const ip = (typeof cfIp === "string" && cfIp) || req.socket.remoteAddress || "unknown";
   try {
     // streak.mangoqwq.com -> reverse proxy to the local PHP streak-stats app.
-    // Request governance mirrors the grs path below: the upstream app derives
-    // its GraphQL cache key from four attacker-controllable free-form params
-    // (generator.php: starting_year/mode/exclude_days/timezone — live-verified
-    // 2026-11-04 that two distinct timezones force two upstream fetches), so
-    // ungoverned URL variance is unauthenticated upstream-API burn plus unbounded
-    // cache-file growth (clearExpiredCache has no callers upstream). Therefore:
-    // unknown params -> 400; `t` stripped; cache-key params stay out of the
-    // allowlist; per-client rate limit; upstream path rebuilt in canonical form.
-    // The PHP app still renders failures as SVG with HTTP 200 (same trap as the
-    // grs upstream error cards), so responses are buffered and error cards are
-    // normalized to 503 + no-store: consumers (update-stats.yml) fail loudly and
-    // CF never caches a broken card.
+    // Two things are worth code here: the refusal of the four cache-key params
+    // (see STREAK_CACHE_KEY_PARAMS) and error-card normalization. Failures are
+    // rendered as SVG with HTTP 200 (same trap as the grs error cards), so
+    // responses are buffered and turned into 503 + no-store: consumers
+    // (update-stats.yml) fail loudly and CF never caches a broken card.
     if (STREAK_HOSTS.has(String(req.headers.host || "").toLowerCase())) {
       const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-      // `t` is tolerated and silently dropped (workflow cache-bust convention,
-      // no PHP-side effect); every other unknown param is a hard 400.
-      const unknown = [...url.searchParams.keys()].filter((k) => !STREAK_PARAM_ALLOWLIST.has(k) && k !== "t");
-      if (unknown.length > 0) {
+      // `t` is the workflow's cache-bust convention; it has no PHP-side effect.
+      url.searchParams.delete("t");
+      const refused = STREAK_CACHE_KEY_PARAMS.filter((k) => url.searchParams.has(k));
+      if (refused.length > 0) {
         res.statusCode = 400;
         noStore(res);
-        return res.end(`Bad Request: unknown parameter(s): ${unknown.join(", ")}`);
+        return res.end(`Bad Request: unsupported parameter(s): ${refused.join(", ")}`);
       }
       if (rateLimited(ip)) {
         res.statusCode = 429;
@@ -172,18 +161,14 @@ async function handleRequest(req, res) {
         res.setHeader("Retry-After", "60");
         return res.end("Too Many Requests");
       }
-      // Forward only allowlisted params in canonical order: the upstream sees a
-      // single stable URL for every variant of the same logical request.
-      const forward = new URL("https://streak.invalid/");
-      for (const k of STREAK_PARAM_ALLOWLIST) {
-        const v = url.searchParams.get(k);
-        if (v !== null) forward.searchParams.set(k, v);
-      }
+      // Fixed param order so one logical request maps to exactly one CF edge
+      // cache key no matter how the caller ordered its params.
+      url.searchParams.sort();
       const upstreamReq = http.request(
         {
           host: STREAK_UPSTREAM_HOST,
           port: STREAK_UPSTREAM_PORT,
-          path: `${forward.pathname}${forward.search}`,
+          path: `${url.pathname}${url.search}`,
           method: req.method,
           headers: { ...req.headers, host: `${STREAK_UPSTREAM_HOST}:${STREAK_UPSTREAM_PORT}` },
         },
