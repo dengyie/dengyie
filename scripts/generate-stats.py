@@ -56,7 +56,7 @@ def main():
     ]
     # Primary: self-hosted streak-stats on hw-sg (same origin as grs, Host-routed
     # via streak.mangoqwq.com; see infrastructure/streak/README.md). `t=` busts the
-    # Cloudflare edge; the PHP app ignores unknown params and caches GraphQL for 24h.
+    # Cloudflare edge; the PHP app caches its GraphQL response for 10min.
     # Fallback: official public instance — recurrently 503 / very slow globally
     # (observed 2026-11-03/04), kept only as a degraded last resort.
     streak_sources = [
