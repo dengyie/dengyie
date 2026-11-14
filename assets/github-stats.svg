@@ -1,7 +1,25 @@
 <svg width="982" height="195" viewBox="0 0 982 195" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="borderFlow" x1="0" y1="0" x2="982" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#70a5fd"/>
+      <stop offset="0.35" stop-color="#bb9af7"/>
+      <stop offset="0.7" stop-color="#9ece6a"/>
+      <stop offset="1" stop-color="#70a5fd"/>
+      <animateTransform attributeName="gradientTransform" type="rotate" from="0 491 97.5" to="360 491 97.5" dur="12s" repeatCount="indefinite"/>
+    </linearGradient>
+    <linearGradient id="shimmerBand" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="cardClip">
+      <rect width="982" height="195" rx="4.5"/>
+    </clipPath>
+  </defs>
   <rect width="982" height="195" rx="4.5" fill="#1A1B27"/>
-  <svg x="5" y="0" width="467" height="195">
-    
+  <g clip-path="url(#cardClip)">
+    <svg x="5" y="0" width="467" height="195">
+      
       <svg
         width="467"
         height="195"
@@ -12,7 +30,7 @@
         aria-labelledby="descId"
       >
         <title id="titleId">mango's GitHub Stats, Rank: A</title>
-        <desc id="descId">Total Stars Earned: 589, Total Commits  : 16613, Total PRs: 576, Total Issues: 40, Contributed to (last year): 3</desc>
+        <desc id="descId">Total Stars Earned: 589, Total Commits  : 16786, Total PRs: 580, Total Issues: 40, Contributed to (last year): 3</desc>
         <style>
           .header {
             font: 600 18px 'Segoe UI', Ubuntu, Sans-Serif;
@@ -76,7 +94,7 @@
         stroke-dashoffset: 251.32741228718345;
       }
       to {
-        stroke-dashoffset: 35.05169053427111;
+        stroke-dashoffset: 35.05048920745589;
       }
     }
   
@@ -180,7 +198,7 @@
         x="219.01"
         y="12.5"
         data-testid="commits"
-      >16.6k</text>
+      >16.8k</text>
     </g>
   </g><g transform="translate(0, 50)">
     <g class="stagger" style="animation-delay: 750ms" transform="translate(25, 0)">
@@ -195,7 +213,7 @@
         x="219.01"
         y="12.5"
         data-testid="prs"
-      >576</text>
+      >580</text>
     </g>
   </g><g transform="translate(0, 75)">
     <g class="stagger" style="animation-delay: 900ms" transform="translate(25, 0)">
@@ -233,10 +251,10 @@
         </g>
       </svg>
     
-  </svg>
-  <line x1="477" y1="28" x2="477" y2="170" vector-effect="non-scaling-stroke" stroke-width="1" stroke="#E4E2E2" stroke-linejoin="miter" stroke-linecap="square" stroke-miterlimit="3"/>
-  <svg x="482" y="0" width="495" height="195">
-    <svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink'
+    </svg>
+    <line x1="477" y1="28" x2="477" y2="170" vector-effect="non-scaling-stroke" stroke-width="1" stroke="#E4E2E2" stroke-linejoin="miter" stroke-linecap="square" stroke-miterlimit="3"/>
+    <svg x="482" y="0" width="495" height="195">
+      <svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink'
                 style='isolation: isolate' viewBox='0 0 495 195' width='495px' height='195px' direction='ltr'>
         <style>
             @keyframes currstreak {
@@ -271,7 +289,7 @@
                 <!-- Total Contributions big number -->
                 <g transform='translate(82.5, 48)'>
                     <text x='0' y='32' stroke-width='0' text-anchor='middle' fill='#70A5FD' stroke='none' font-family='"Segoe UI", Ubuntu, sans-serif' font-weight='700' font-size='28px' font-style='normal' style='opacity: 0; animation: fadein 0.5s linear forwards 0.6s'>
-                        21,974
+                        22,151
                     </text>
                 </g>
 
@@ -300,7 +318,7 @@
                 <!-- Current Streak range -->
                 <g transform='translate(247.5, 145)'>
                     <text x='0' y='21' stroke-width='0' text-anchor='middle' fill='#38BDAE' stroke='none' font-family='"Segoe UI", Ubuntu, sans-serif' font-weight='400' font-size='12px' font-style='normal' style='opacity: 0; animation: fadein 0.5s linear forwards 0.9s'>
-                        May 31 - Nov 14
+                        May 31 - Nov 15
                     </text>
                 </g>
 
@@ -317,7 +335,7 @@
                 <!-- Current Streak big number -->
                 <g transform='translate(247.5, 48)'>
                     <text x='0' y='32' stroke-width='0' text-anchor='middle' fill='#BF91F3' stroke='none' font-family='"Segoe UI", Ubuntu, sans-serif' font-weight='700' font-size='28px' font-style='normal' style='animation: currstreak 0.6s linear forwards'>
-                        168
+                        169
                     </text>
                 </g>
 
@@ -326,7 +344,7 @@
                 <!-- Longest Streak big number -->
                 <g transform='translate(412.5, 48)'>
                     <text x='0' y='32' stroke-width='0' text-anchor='middle' fill='#70A5FD' stroke='none' font-family='"Segoe UI", Ubuntu, sans-serif' font-weight='700' font-size='28px' font-style='normal' style='opacity: 0; animation: fadein 0.5s linear forwards 1.2s'>
-                        168
+                        169
                     </text>
                 </g>
 
@@ -340,7 +358,7 @@
                 <!-- Longest Streak range -->
                 <g transform='translate(412.5, 114)'>
                     <text x='0' y='32' stroke-width='0' text-anchor='middle' fill='#38BDAE' stroke='none' font-family='"Segoe UI", Ubuntu, sans-serif' font-weight='400' font-size='12px' font-style='normal' style='opacity: 0; animation: fadein 0.5s linear forwards 1.4s'>
-                        May 31 - Nov 14
+                        May 31 - Nov 15
                     </text>
                 </g>
             </g>
@@ -348,5 +366,10 @@
         </g>
     </svg>
 
-  </svg>
+    </svg>
+    <rect x="-140" y="-30" width="110" height="255" fill="url(#shimmerBand)" transform="skewX(-18)">
+      <animate attributeName="x" values="-140;1032" dur="9s" begin="2s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+  <rect x="0.75" y="0.75" width="980.5" height="193.5" rx="4.5" fill="none" stroke="url(#borderFlow)" stroke-width="1.5" opacity="0.9"/>
 </svg>
